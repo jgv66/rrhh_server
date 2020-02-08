@@ -187,7 +187,7 @@ contruyeHTML = function(data, fullpathHTM) {
         //
         var buff = new Buffer(data[0].archivo, 'base64');
         var xHTML = buff.toString('ascii');
-        console.log(xHTML);
+        // console.log(xHTML);
         //
         xHTML = xHTML.replace('##logo##', 'https://kinetik.cl/rrhh01/img/varso_logo.png');
         xHTML = xHTML.replace('##firma##', 'https://kinetik.cl/rrhh01/img/varso_firma.png');
