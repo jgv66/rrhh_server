@@ -7,8 +7,7 @@ var nodemailer = require('nodemailer');
 var mailId = require('./direcciones_mail.js');
 var base642pdf = require('base64topdf');
 var path = require('path');
-var wkhtmltopdf = require('wkhtmltopdf');
-var node_wkhtmltopdf = require('node-wkhtmltopdf');
+var wkhtmltopdf = require('insane-wkhtmltopdf');
 var fs = require("fs");
 var fileExist = require('file-exists');
 //
@@ -109,7 +108,7 @@ app.post('/leerPDFLiquidacion',
                 //
                 var filename = `liq_${req.body.ficha.trim()}_${req.body.filename }.pdf`;
                 var fullpath = path.join(CARPETA_PDF, filename);
-                // 
+                //
                 var base64_pdf = base642pdf.base64Decode(data, fullpath);
                 res.json({ resultado: 'ok', datos: filename, base64: base64_pdf });
                 //
@@ -121,7 +120,7 @@ app.post('/leerPDFLiquidacion',
     });
 
 /*  sudo apt-get install wkhtmltopdf
-    npm install wkhtmltopdf 
+    npm install wkhtmltopdf
 */
 app.post('/leerCertAntiguedad',
     function(req, res) {
@@ -130,47 +129,56 @@ app.post('/leerCertAntiguedad',
         //
         reg.getBase64Cert(sql, req.body.key, req.body.ficha)
             .then(function(data) {
-                //
+
                 var filenamePDF = `cert_antig_${req.body.ficha.trim()}.pdf`;
                 var filenameHTM = `cert_antig_${req.body.ficha.trim()}.html`;
                 var fullpathPDF = path.join(CARPETA_PDF, filenamePDF);
                 var fullpathHTM = path.join(CARPETA_PDF, filenameHTM);
-                //
+
                 contruyeHTML(data, fullpathHTM)
                     .then(htmlContent => {
-                        //    
+                        // console.log(htmlContent);
                         try {
                             // xHTML = fs.readFileSync(htmlContent);
                             // console.log(htmlContent);
                             // wkhtmltopdf('http://apple.com/', { output: path.join(CARPETA_PDF, 'out.pdf') });
                             //
-                            wkhtmltopdf(htmlContent, { output: fullpathPDF });
                             //
-                            var options = [
-                                '--quiet',
-                                '--no-background',
-                                '--margin-bottom 1',
-                                '--margin-left 1',
-                                '--margin-right 1',
-                                '--margin-top 1'
-                            ];
-                            node_wkhtmltopdf(options, htmlContent, fullpathPDF);
-                            //
-                            res.json({ resultado: 'ok', datos: filenamePDF, base64: fullpathPDF });
-                            //
+                            wkhtmltopdf(
+                                htmlContent,
+                                {
+                                    output: fullpathPDF,
+                                    zoom: 1,
+                                    dpi: 300,
+                                    pageSize: 'letter',
+                                    noBackground: true,
+                                    disableSmartShrinking: true
+                                },
+                                (err, stream) => {
+                                    if (err) {
+                                        console.error('No se pudo generar el PDF ', fullpathPDF, err);
+                                        res.status(500).json({ resultado: 'error', datos: err })
+                                    } else {
+                                        res.status(200).json({ resultado: 'ok', datos: filenamePDF, base64: fullpathPDF });
+                                    }
+                                }
+                            );
+
+
                         } catch (error) {
-                            console.log('Error!', error);
-                            console.log('/leerCertAntiguedad ', error);
-                            res.json({ resultado: 'error', datos: error });
+                            console.error('Error!', error);
+                            console.error('/leerCertAntiguedad ', error);
+                            res.status(500).json({ resultado: 'error', datos: error });
                         }
                         //
                     }, (err) => {
-                        console.log(err);
+                            console.error(err);
+                            res.status(500).json({ resultado: 'error', datos: err });
                     });
             })
             .catch(function(err) {
                 console.log("/leerCertAntiguedad cath() >>>", err);
-                res.json({ resultado: 'error', datos: err });
+                resres.status(500).json({ resultado: 'error', datos: err });
             });
     });
 contruyeHTML = function(data, fullpathHTM) {
@@ -179,6 +187,7 @@ contruyeHTML = function(data, fullpathHTM) {
         //
         var buff = new Buffer(data[0].archivo, 'base64');
         var xHTML = buff.toString('ascii');
+        console.log(xHTML);
         //
         xHTML = xHTML.replace('##logo##', 'https://kinetik.cl/rrhh01/img/varso_logo.png');
         xHTML = xHTML.replace('##firma##', 'https://kinetik.cl/rrhh01/img/varso_firma.png');
@@ -189,15 +198,28 @@ contruyeHTML = function(data, fullpathHTM) {
         xHTML = xHTML.replace('##dia_hoy##', data[0].dia_hoy);
         xHTML = xHTML.replace('##mes_hoy##', data[0].mes_hoy);
         xHTML = xHTML.replace('##anno_hoy##', data[0].anno_hoy);
-        //
-        fs.writeFileSync(fullpathHTM, xHTML);
-        //
-        if (fileExist.sync(fullpathHTM)) {
-            console.log('archivo existe ', fullpathHTM);
-            resolve(xHTML);
+
+        fs.writeFile(fullpathHTM, xHTML, { encoding: 'utf-8' }, errData => {
+            console.log(errData);
+            if (!errData) {
+                if (fileExist.sync(fullpathHTM)) {
+                    console.log('archivo existe ', fullpathHTM);
+                    // El archivo no se necesita para convertirlo a PDF
+                    // basta pasarle el contenido html
+                    resolve(xHTML);
+                }
+            } else {
+                throw Error(errData);
+            }
+        });
+
+
+
+    },
+        reject => {
+            reject('Algo paso....');
         }
-        //
-    });
+    );
     //
 };
 
@@ -305,7 +327,7 @@ app.post('/leerMensajes',
         //
         reg.leermensajes(sql, req.body.ficha)
             .then(function(data) {
-                // console.log("/validarUser ",data); 
+                // console.log("/validarUser ",data);
                 res.json({ resultado: 'ok', datos: data });
             })
             .catch(function(err) {
@@ -319,7 +341,7 @@ app.post('/cierraMensaje',
         //
         reg.cerrarmensaje(sql, req.body.id)
             .then(function(data) {
-                // console.log("/validarUser ",data); 
+                // console.log("/validarUser ",data);
                 res.json({ resultado: 'ok', datos: data });
             })
             .catch(function(err) {
@@ -406,7 +428,7 @@ app.post('/leerRegiones',
         //
         reg.regiones(sql)
             .then(function(data) {
-                // console.log("/leerRegiones ",data); 
+                // console.log("/leerRegiones ",data);
                 res.json({ resultado: 'ok', datos: data });
             })
             .catch(function(err) {
@@ -419,7 +441,7 @@ app.post('/leerCiudades',
         //
         reg.ciudades(sql, req.body.region)
             .then(function(data) {
-                // console.log("/leerCiudades ",data); 
+                // console.log("/leerCiudades ",data);
                 res.json({ resultado: 'ok', datos: data });
             })
             .catch(function(err) {
@@ -432,7 +454,7 @@ app.post('/leerComunas',
         //
         reg.comunas(sql, req.body.region)
             .then(function(data) {
-                // console.log("/leerComunas ",data); 
+                // console.log("/leerComunas ",data);
                 res.json({ resultado: 'ok', datos: data });
             })
             .catch(function(err) {
