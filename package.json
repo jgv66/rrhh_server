@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "base64topdf": "^1.1.8",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "file-exists": "^5.0.1",
     "insane-wkhtmltopdf": "^0.3.4",
     "mssql": "^5.1.0",
